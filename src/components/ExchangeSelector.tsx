@@ -6,7 +6,7 @@ interface ExchangeSelectorProps {
 }
 
 const exchanges = [
-  { name: 'USA (S&P 500, NYSE, NASDAQ)', code: 'US' },
+  { name: 'USA (ALL Stocks - NYSE, NASDAQ, AMEX, etc.)', code: 'US' },
   { name: 'Cyprus Stock Exchange', code: 'CY' },
 ];
 

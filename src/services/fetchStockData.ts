@@ -24,12 +24,23 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
     console.log(`Fetching stocks for exchange: ${exchange}`);
 
     // Step 1: Fetch stocks by exchange
-    // Configure exchange-specific parameters for multiple US exchanges
+    // Configure exchange-specific parameters for ALL US exchanges
     const exchangeConfig = {
       'US': [
         { exchange: 'US', mic: 'XNYS', currency: 'USD', name: 'NYSE' },
         { exchange: 'US', mic: 'XNAS', currency: 'USD', name: 'NASDAQ' },
-        { exchange: 'US', mic: '', currency: 'USD', name: 'S&P 500' }
+        { exchange: 'US', mic: 'XASE', currency: 'USD', name: 'AMEX' },
+        { exchange: 'US', mic: 'ARCX', currency: 'USD', name: 'ARCA' },
+        { exchange: 'US', mic: 'BATS', currency: 'USD', name: 'BATS' },
+        { exchange: 'US', mic: 'EDGX', currency: 'USD', name: 'EDGX' },
+        { exchange: 'US', mic: 'EDGA', currency: 'USD', name: 'EDGA' },
+        { exchange: 'US', mic: 'IEXG', currency: 'USD', name: 'IEX' },
+        { exchange: 'US', mic: 'LTSE', currency: 'USD', name: 'LTSE' },
+        { exchange: 'US', mic: 'MEMX', currency: 'USD', name: 'MEMX' },
+        { exchange: 'US', mic: 'MIAX', currency: 'USD', name: 'MIAX' },
+        { exchange: 'US', mic: 'NEOE', currency: 'USD', name: 'NEO' },
+        { exchange: 'US', mic: 'PSX', currency: 'USD', name: 'PSX' },
+        { exchange: 'US', mic: '', currency: 'USD', name: 'All US Stocks' }
       ],
       'CY': [{ exchange: 'CY', mic: '', currency: 'EUR', name: 'Cyprus' }]
     };
@@ -38,7 +49,7 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
     
     // Fetch stocks from all configured exchanges
     const allSymbolsPromises = configs.map(async (config) => {
-      const symbolsUrl = `https://finnhub.io/api/v1/stock/symbol?exchange=${config.exchange}${config.mic ? `&mic=${config.mic}` : ''}&securityType=Common%20Stock&currency=${config.currency}&token=${apiKey}`;
+      const symbolsUrl = `https://finnhub.io/api/v1/stock/symbol?exchange=${config.exchange}${config.mic ? `&mic=${config.mic}` : ''}&currency=${config.currency}&token=${apiKey}`;
       
       console.log(`Fetching from ${config.name}:`, symbolsUrl);
       
@@ -79,17 +90,12 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
       return [];
     }
 
-    // Get all available tickers from the exchanges with enhanced filtering
-    const maxStocks = exchange === 'US' ? 500 : 50; // Increased limit for US stocks
+    // Get ALL available tickers from the exchanges - NO FILTERING
     const exchangeStocks = symbolsData
       .filter((stock: any) => {
-        // Filter for quality stocks: must have a symbol and be a common stock
-        return stock.symbol && 
-               stock.type === 'Common Stock' && 
-               stock.symbol.length <= 5 && // Avoid complex symbols
-               !stock.symbol.includes('.'); // Avoid preferred shares
+        // Only basic validation: must have a symbol
+        return stock.symbol && stock.symbol.trim() !== '';
       })
-      .slice(0, maxStocks)
       .map((stock: any) => stock.symbol)
       .filter(Boolean); // Remove any undefined/null symbols
 
@@ -100,30 +106,48 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
       return [];
     }
 
-    // Step 2: Fetch metrics for each stock
-    const stockPromises = exchangeStocks.map(async (ticker: string) => {
-      try {
-        const [profileResponse, metricsResponse] = await Promise.all([
-          fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${apiKey}`, { next: { revalidate: 3600 } }),
-          fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${apiKey}`, { next: { revalidate: 3600 } })
-        ]);
+    // Step 2: Fetch metrics for each stock (with progress tracking)
+    console.log(`Starting to fetch data for ${exchangeStocks.length} stocks...`);
+    
+    // Process stocks in batches to avoid overwhelming the API
+    const batchSize = 50;
+    const allStockData = [];
+    
+    for (let i = 0; i < exchangeStocks.length; i += batchSize) {
+      const batch = exchangeStocks.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(exchangeStocks.length / batchSize)} (${batch.length} stocks)`);
+      
+      const batchPromises = batch.map(async (ticker: string) => {
+        try {
+          const [profileResponse, metricsResponse] = await Promise.all([
+            fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${apiKey}`, { next: { revalidate: 3600 } }),
+            fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${apiKey}`, { next: { revalidate: 3600 } })
+          ]);
 
-        const profileData = await profileResponse.json();
-        const metricsData = await metricsResponse.json();
+          const profileData = await profileResponse.json();
+          const metricsData = await metricsResponse.json();
 
-        return {
-          ticker,
-          profile: profileData,
-          metrics: metricsData
-        };
-      } catch (error) {
-        console.error(`Error fetching data for ${ticker}:`, error);
-        return null;
+          return {
+            ticker,
+            profile: profileData,
+            metrics: metricsData
+          };
+        } catch (error) {
+          console.error(`Error fetching data for ${ticker}:`, error);
+          return null;
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      allStockData.push(...batchResults.filter(data => data !== null));
+      
+      // Small delay between batches to be respectful to the API
+      if (i + batchSize < exchangeStocks.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-    });
-
-    const stockData = await Promise.all(stockPromises);
-    const validStockData = stockData.filter(data => data !== null);
+    }
+    
+    const validStockData = allStockData;
 
     // Step 3: Combine and format the data
     const formattedStocks: Stock[] = validStockData.map((data: any) => {
