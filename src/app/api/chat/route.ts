@@ -54,11 +54,28 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('Sending prompt to Gemini:', prompt);
+    console.log('Prompt length:', prompt.length);
     
-    // Use generateContent instead of chat for simpler approach
-    const result = await model.generateContent(prompt);
+    // Use generateContent with safety checks and timeout
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Gemini API timeout')), 30000)
+      )
+    ]) as any;
+    
+    if (!result || !result.response) {
+      throw new Error('No response received from Gemini API');
+    }
+    
     const response = await result.response;
     const text = response.text();
+    
+    if (!text) {
+      throw new Error('Empty response from Gemini API');
+    }
+    
+    console.log('Received response from Gemini, length:', text.length);
 
     return NextResponse.json({ response: text });
 
