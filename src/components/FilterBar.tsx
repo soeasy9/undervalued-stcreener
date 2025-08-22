@@ -18,7 +18,7 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
   const [dividendYield, setDividendYield] = useState<[number, number]>([0, 15]);
 
   const handlePeChange = (value: number | number[]) => {
-    const newValue = Array.isArray(value) ? value as [number, number] : [0, value];
+    const newValue: [number, number] = Array.isArray(value) ? [value[0], value[1]] : [0, value];
     setPeRatio(newValue);
     onFilterChange({
       peRatio: newValue,
@@ -28,7 +28,7 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
   };
 
   const handlePbChange = (value: number | number[]) => {
-    const newValue = Array.isArray(value) ? value as [number, number] : [0, value];
+    const newValue: [number, number] = Array.isArray(value) ? [value[0], value[1]] : [0, value];
     setPbRatio(newValue);
     onFilterChange({
       peRatio,
@@ -38,7 +38,7 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
   };
 
   const handleDividendYieldChange = (value: number | number[]) => {
-    const newValue = Array.isArray(value) ? value as [number, number] : [0, value];
+    const newValue: [number, number] = Array.isArray(value) ? [value[0], value[1]] : [0, value];
     setDividendYield(newValue);
     onFilterChange({
       peRatio,
