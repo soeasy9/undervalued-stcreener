@@ -50,7 +50,9 @@ export async function POST(request: NextRequest) {
     // Create a simple prompt with system context
     let prompt = lastUserMessage.content;
     if (systemMessage) {
-      prompt = `${systemMessage.content}\n\nUser Question: ${lastUserMessage.content}\n\nPlease provide a detailed financial analysis based on the stock data provided.`;
+      // Simplify the system message to avoid potential issues
+      const stockInfo = systemMessage.content.split('\n')[0]; // Just get the first line
+      prompt = `You are a financial analyst. ${stockInfo}\n\nUser Question: ${lastUserMessage.content}\n\nProvide a brief financial analysis.`;
     }
     
     console.log('Sending prompt to Gemini:', prompt);
@@ -85,9 +87,19 @@ export async function POST(request: NextRequest) {
     // Return more specific error information for debugging
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    return NextResponse.json(
-      { error: `Failed to process chat request: ${errorMessage}` },
-      { status: 500 }
-    );
+    // Provide a fallback response instead of an error
+    const fallbackResponse = `I apologize, but I'm having trouble accessing my analysis tools right now. Based on the stock data available, I can provide some general insights:
+
+- P/E Ratio: This measures how much investors are willing to pay for each dollar of earnings
+- P/B Ratio: This compares the stock price to the company's book value
+- Dividend Yield: This shows the annual dividend as a percentage of the stock price
+
+For specific analysis, please try again in a moment or consult with a financial advisor.`;
+    
+    return NextResponse.json({ 
+      response: fallbackResponse,
+      error: `API Error: ${errorMessage}`,
+      fallback: true
+    });
   }
 }

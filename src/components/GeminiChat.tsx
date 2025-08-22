@@ -88,6 +88,11 @@ Based on this data, provide expert financial analysis. Be concise, professional,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // If it's a fallback response, show a note
+      if (data.fallback) {
+        console.log('Using fallback response due to API error:', data.error);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
