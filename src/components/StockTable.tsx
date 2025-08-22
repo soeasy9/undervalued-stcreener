@@ -51,7 +51,7 @@ export default function StockTable({ stocks }: StockTableProps) {
 
   const formatValue = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
-    return typeof value === 'number' ? value.toFixed(2) : value.toString();
+    return value.toFixed(2);
   };
 
   const getSortIcon = (field: SortField) => {
