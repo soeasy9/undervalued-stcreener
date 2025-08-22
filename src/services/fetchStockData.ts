@@ -91,11 +91,13 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
     }
 
     // Get ALL available tickers from the exchanges - NO FILTERING
+    const maxStocksToFetch = exchange === 'US' ? 2000 : 100; // Increased limit for US stocks
     const exchangeStocks = symbolsData
       .filter((stock: any) => {
         // Only basic validation: must have a symbol
         return stock.symbol && stock.symbol.trim() !== '';
       })
+      .slice(0, maxStocksToFetch) // Limit to prevent overwhelming the API
       .map((stock: any) => stock.symbol)
       .filter(Boolean); // Remove any undefined/null symbols
 
@@ -110,7 +112,7 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
     console.log(`Starting to fetch data for ${exchangeStocks.length} stocks...`);
     
     // Process stocks in batches to avoid overwhelming the API
-    const batchSize = 50;
+    const batchSize = 100; // Increased batch size
     const allStockData = [];
     
     for (let i = 0; i < exchangeStocks.length; i += batchSize) {
@@ -138,13 +140,16 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
         }
       });
       
-      const batchResults = await Promise.all(batchPromises);
-      allStockData.push(...batchResults.filter(data => data !== null));
-      
-      // Small delay between batches to be respectful to the API
-      if (i + batchSize < exchangeStocks.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+             const batchResults = await Promise.all(batchPromises);
+       const validResults = batchResults.filter(data => data !== null);
+       allStockData.push(...validResults);
+       
+       console.log(`Batch ${Math.floor(i / batchSize) + 1}: ${validResults.length}/${batch.length} stocks fetched successfully`);
+       
+       // Small delay between batches to be respectful to the API
+       if (i + batchSize < exchangeStocks.length) {
+         await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay
+       }
     }
     
     const validStockData = allStockData;
