@@ -1,6 +1,7 @@
-import { fetchStockDetails } from '@/services/fetchStockData';
+import { fetchStockDetails, fetchUndervaluedStocks } from '@/services/fetchStockData';
 import TradingViewWidget from '@/components/TradingViewWidget';
 import BackButton from '@/components/BackButton';
+import GeminiChat from '@/components/GeminiChat';
 import { notFound } from 'next/navigation';
 
 interface StockPageProps {
@@ -18,6 +19,18 @@ export default async function StockPage({ params }: StockPageProps) {
     if (!stockDetails) {
       notFound();
     }
+
+    // Fetch stock data for the chat component
+    const allStocks = await fetchUndervaluedStocks('US');
+    const stockData = allStocks.find(stock => stock.ticker === ticker) || {
+      ticker,
+      name: ticker,
+      peRatio: null,
+      pbRatio: null,
+      deRatio: null,
+      dividendYield: null,
+      pegRatio: null
+    };
 
     return (
       <div className="min-h-screen bg-gray-900 text-white">
@@ -112,6 +125,9 @@ export default async function StockPage({ params }: StockPageProps) {
               </div>
             </div>
           )}
+
+          {/* AI Financial Analyst Chat */}
+          <GeminiChat stock={stockData} />
         </div>
       </div>
     );
