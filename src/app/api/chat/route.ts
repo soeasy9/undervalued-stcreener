@@ -30,47 +30,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Received messages:', JSON.stringify(messages, null, 2));
+
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    // Get the system message and user messages
+    // Get the system message and the last user message
     const systemMessage = messages.find(msg => msg.role === 'system');
-    const userMessages = messages.filter(msg => msg.role === 'user');
-    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+    const lastUserMessage = messages.filter(msg => msg.role === 'user').pop();
     
-    // Build the conversation history
-    const history = [];
-    for (let i = 0; i < Math.min(userMessages.length - 1, assistantMessages.length); i++) {
-      history.push({
-        role: 'user',
-        parts: [{ text: userMessages[i].content }]
-      });
-      history.push({
-        role: 'model',
-        parts: [{ text: assistantMessages[i].content }]
-      });
+    if (!lastUserMessage) {
+      return NextResponse.json(
+        { error: 'No user message found' },
+        { status: 400 }
+      );
     }
     
-    // Create the chat
-    const chat = model.startChat({
-      history,
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7,
-      },
-    });
-
-    // Get the last user message
-    const lastUserMessage = userMessages[userMessages.length - 1];
-    
-    // Create the prompt with system message if available
+    // Create a simple prompt with system context
     let prompt = lastUserMessage.content;
     if (systemMessage) {
-      prompt = `${systemMessage.content}\n\nUser: ${lastUserMessage.content}`;
+      prompt = `${systemMessage.content}\n\nUser Question: ${lastUserMessage.content}\n\nPlease provide a detailed financial analysis based on the stock data provided.`;
     }
     
-    const result = await chat.sendMessage(prompt);
+    console.log('Sending prompt to Gemini:', prompt);
+    
+    // Use generateContent instead of chat for simpler approach
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
