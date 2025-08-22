@@ -24,19 +24,45 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
     console.log(`Fetching stocks for exchange: ${exchange}`);
 
     // Step 1: Fetch stocks by exchange
-    // Configure exchange-specific parameters
+    // Configure exchange-specific parameters for multiple US exchanges
     const exchangeConfig = {
-      'US': { exchange: 'US', mic: 'XNYS', currency: 'USD' },
-      'CY': { exchange: 'CY', mic: '', currency: 'EUR' }
+      'US': [
+        { exchange: 'US', mic: 'XNYS', currency: 'USD', name: 'NYSE' },
+        { exchange: 'US', mic: 'XNAS', currency: 'USD', name: 'NASDAQ' },
+        { exchange: 'US', mic: '', currency: 'USD', name: 'S&P 500' }
+      ],
+      'CY': [{ exchange: 'CY', mic: '', currency: 'EUR', name: 'Cyprus' }]
     };
     
-    const config = exchangeConfig[exchange as keyof typeof exchangeConfig] || exchangeConfig['US'];
-    const symbolsUrl = `https://finnhub.io/api/v1/stock/symbol?exchange=${config.exchange}${config.mic ? `&mic=${config.mic}` : ''}&securityType=Common%20Stock&currency=${config.currency}&token=${apiKey}`;
+    const configs = exchangeConfig[exchange as keyof typeof exchangeConfig] || exchangeConfig['US'];
     
-    console.log('Fetching from URL:', symbolsUrl);
+    // Fetch stocks from all configured exchanges
+    const allSymbolsPromises = configs.map(async (config) => {
+      const symbolsUrl = `https://finnhub.io/api/v1/stock/symbol?exchange=${config.exchange}${config.mic ? `&mic=${config.mic}` : ''}&securityType=Common%20Stock&currency=${config.currency}&token=${apiKey}`;
+      
+      console.log(`Fetching from ${config.name}:`, symbolsUrl);
+      
+      try {
+        const symbolsResponse = await fetch(symbolsUrl, { next: { revalidate: 3600 } });
+        const symbolsData = await symbolsResponse.json();
+        
+        console.log(`${config.name} Response length:`, symbolsData?.length);
+        
+        if (Array.isArray(symbolsData)) {
+          return symbolsData.map((stock: any) => ({
+            ...stock,
+            exchange: config.name
+          }));
+        }
+        return [];
+      } catch (error) {
+        console.error(`Error fetching from ${config.name}:`, error);
+        return [];
+      }
+    });
     
-    const symbolsResponse = await fetch(symbolsUrl, { next: { revalidate: 3600 } });
-    const symbolsData = await symbolsResponse.json();
+    const allSymbolsResults = await Promise.all(allSymbolsPromises);
+    const symbolsData = allSymbolsResults.flat();
 
     console.log('API Response:', symbolsData);
     console.log('Response type:', typeof symbolsData);
@@ -53,9 +79,16 @@ export async function fetchUndervaluedStocks(exchange: string = 'US'): Promise<S
       return [];
     }
 
-    // Get all available tickers from the exchange (or limit to a reasonable number for performance)
-    const maxStocks = exchange === 'US' ? 100 : 50; // More US stocks, fewer Cyprus stocks for performance
+    // Get all available tickers from the exchanges with enhanced filtering
+    const maxStocks = exchange === 'US' ? 500 : 50; // Increased limit for US stocks
     const exchangeStocks = symbolsData
+      .filter((stock: any) => {
+        // Filter for quality stocks: must have a symbol and be a common stock
+        return stock.symbol && 
+               stock.type === 'Common Stock' && 
+               stock.symbol.length <= 5 && // Avoid complex symbols
+               !stock.symbol.includes('.'); // Avoid preferred shares
+      })
       .slice(0, maxStocks)
       .map((stock: any) => stock.symbol)
       .filter(Boolean); // Remove any undefined/null symbols
@@ -549,7 +582,7 @@ function getMockStocks(exchange: string): Stock[] {
     ];
   } else {
     return [
-      // Technology Giants
+      // S&P 500 & Major US Stocks - Technology
       {
         ticker: 'AAPL',
         name: 'Apple Inc.',
@@ -835,6 +868,296 @@ function getMockStocks(exchange: string): Stock[] {
         pbRatio: 1.5,
         deRatio: null,
         dividendYield: 0.0,
+        pegRatio: null
+      },
+      // Additional S&P 500 & Major US Stocks
+      // Healthcare & Biotech
+      {
+        ticker: 'UNH',
+        name: 'UnitedHealth Group Inc.',
+        peRatio: 18.2,
+        pbRatio: 4.1,
+        deRatio: null,
+        dividendYield: 1.5,
+        pegRatio: null
+      },
+      {
+        ticker: 'ABT',
+        name: 'Abbott Laboratories',
+        peRatio: 16.8,
+        pbRatio: 3.2,
+        deRatio: null,
+        dividendYield: 2.1,
+        pegRatio: null
+      },
+      {
+        ticker: 'TMO',
+        name: 'Thermo Fisher Scientific',
+        peRatio: 32.4,
+        pbRatio: 4.8,
+        deRatio: null,
+        dividendYield: 0.3,
+        pegRatio: null
+      },
+      {
+        ticker: 'DHR',
+        name: 'Danaher Corp.',
+        peRatio: 29.7,
+        pbRatio: 3.9,
+        deRatio: null,
+        dividendYield: 0.4,
+        pegRatio: null
+      },
+      // Consumer Goods
+      {
+        ticker: 'NKE',
+        name: 'Nike Inc.',
+        peRatio: 31.2,
+        pbRatio: 8.7,
+        deRatio: null,
+        dividendYield: 1.2,
+        pegRatio: null
+      },
+      {
+        ticker: 'SBUX',
+        name: 'Starbucks Corp.',
+        peRatio: 26.8,
+        pbRatio: 12.3,
+        deRatio: null,
+        dividendYield: 2.1,
+        pegRatio: null
+      },
+      {
+        ticker: 'MCD',
+        name: 'McDonald\'s Corp.',
+        peRatio: 24.6,
+        pbRatio: 8.9,
+        deRatio: null,
+        dividendYield: 2.3,
+        pegRatio: null
+      },
+      // Industrial & Manufacturing
+      {
+        ticker: 'MMM',
+        name: '3M Company',
+        peRatio: 12.4,
+        pbRatio: 4.2,
+        deRatio: null,
+        dividendYield: 6.2,
+        pegRatio: null
+      },
+      {
+        ticker: 'HON',
+        name: 'Honeywell International',
+        peRatio: 20.8,
+        pbRatio: 6.1,
+        deRatio: null,
+        dividendYield: 2.0,
+        pegRatio: null
+      },
+      {
+        ticker: 'UPS',
+        name: 'United Parcel Service',
+        peRatio: 16.9,
+        pbRatio: 7.3,
+        deRatio: null,
+        dividendYield: 4.1,
+        pegRatio: null
+      },
+      // Communication Services
+      {
+        ticker: 'CMCSA',
+        name: 'Comcast Corp.',
+        peRatio: 11.8,
+        pbRatio: 1.9,
+        deRatio: null,
+        dividendYield: 3.4,
+        pegRatio: null
+      },
+      {
+        ticker: 'CHTR',
+        name: 'Charter Communications',
+        peRatio: 15.2,
+        pbRatio: 2.1,
+        deRatio: null,
+        dividendYield: null,
+        pegRatio: null
+      },
+      // Materials
+      {
+        ticker: 'LIN',
+        name: 'Linde plc',
+        peRatio: 25.3,
+        pbRatio: 3.4,
+        deRatio: null,
+        dividendYield: 1.3,
+        pegRatio: null
+      },
+      {
+        ticker: 'APD',
+        name: 'Air Products & Chemicals',
+        peRatio: 22.7,
+        pbRatio: 3.8,
+        deRatio: null,
+        dividendYield: 2.6,
+        pegRatio: null
+      },
+      // Additional Technology
+      {
+        ticker: 'ADBE',
+        name: 'Adobe Inc.',
+        peRatio: 38.9,
+        pbRatio: 12.4,
+        deRatio: null,
+        dividendYield: null,
+        pegRatio: null
+      },
+      {
+        ticker: 'CRM',
+        name: 'Salesforce Inc.',
+        peRatio: 42.1,
+        pbRatio: 3.2,
+        deRatio: null,
+        dividendYield: null,
+        pegRatio: null
+      },
+      {
+        ticker: 'ORCL',
+        name: 'Oracle Corp.',
+        peRatio: 18.6,
+        pbRatio: 4.7,
+        deRatio: null,
+        dividendYield: 1.6,
+        pegRatio: null
+      },
+      {
+        ticker: 'INTC',
+        name: 'Intel Corp.',
+        peRatio: 15.8,
+        pbRatio: 1.4,
+        deRatio: null,
+        dividendYield: 5.2,
+        pegRatio: null
+      },
+      {
+        ticker: 'AMD',
+        name: 'Advanced Micro Devices',
+        peRatio: 45.2,
+        pbRatio: 8.9,
+        deRatio: null,
+        dividendYield: null,
+        pegRatio: null
+      },
+      // Additional Financial
+      {
+        ticker: 'BLK',
+        name: 'BlackRock Inc.',
+        peRatio: 19.4,
+        pbRatio: 2.8,
+        deRatio: null,
+        dividendYield: 2.8,
+        pegRatio: null
+      },
+      {
+        ticker: 'SPGI',
+        name: 'S&P Global Inc.',
+        peRatio: 26.8,
+        pbRatio: 4.2,
+        deRatio: null,
+        dividendYield: 0.9,
+        pegRatio: null
+      },
+      {
+        ticker: 'ICE',
+        name: 'Intercontinental Exchange',
+        peRatio: 22.1,
+        pbRatio: 2.9,
+        deRatio: null,
+        dividendYield: 1.4,
+        pegRatio: null
+      },
+      // Additional Healthcare
+      {
+        ticker: 'CVS',
+        name: 'CVS Health Corp.',
+        peRatio: 11.2,
+        pbRatio: 1.3,
+        deRatio: null,
+        dividendYield: 3.8,
+        pegRatio: null
+      },
+      {
+        ticker: 'ANTM',
+        name: 'Anthem Inc.',
+        peRatio: 16.8,
+        pbRatio: 2.1,
+        deRatio: null,
+        dividendYield: 1.2,
+        pegRatio: null
+      },
+      {
+        ticker: 'CI',
+        name: 'Cigna Corp.',
+        peRatio: 14.3,
+        pbRatio: 1.8,
+        deRatio: null,
+        dividendYield: 1.8,
+        pegRatio: null
+      },
+      // Additional Consumer
+      {
+        ticker: 'COST',
+        name: 'Costco Wholesale Corp.',
+        peRatio: 42.8,
+        pbRatio: 8.9,
+        deRatio: null,
+        dividendYield: 0.7,
+        pegRatio: null
+      },
+      {
+        ticker: 'TGT',
+        name: 'Target Corp.',
+        peRatio: 18.9,
+        pbRatio: 5.2,
+        deRatio: null,
+        dividendYield: 2.1,
+        pegRatio: null
+      },
+      {
+        ticker: 'LOW',
+        name: 'Lowe\'s Companies',
+        peRatio: 20.4,
+        pbRatio: 12.8,
+        deRatio: null,
+        dividendYield: 1.8,
+        pegRatio: null
+      },
+      // Additional Energy
+      {
+        ticker: 'COP',
+        name: 'ConocoPhillips',
+        peRatio: 8.9,
+        pbRatio: 2.1,
+        deRatio: null,
+        dividendYield: 4.2,
+        pegRatio: null
+      },
+      {
+        ticker: 'EOG',
+        name: 'EOG Resources',
+        peRatio: 12.4,
+        pbRatio: 2.8,
+        deRatio: null,
+        dividendYield: 2.8,
+        pegRatio: null
+      },
+      {
+        ticker: 'SLB',
+        name: 'Schlumberger Ltd.',
+        peRatio: 18.7,
+        pbRatio: 2.4,
+        deRatio: null,
+        dividendYield: 2.1,
         pegRatio: null
       }
     ];
