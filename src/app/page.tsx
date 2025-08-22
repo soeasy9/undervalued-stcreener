@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import ExchangeSelector from '@/components/ExchangeSelector';
 import FilterBar from '@/components/FilterBar';
+import StrategyButtons from '@/components/StrategyButtons';
 import StockTable from '@/components/StockTable';
 import { fetchUndervaluedStocks, Stock } from '@/services/fetchStockData';
 
@@ -10,6 +11,7 @@ export default function Home() {
   const [selectedExchange, setSelectedExchange] = useState<string>('US');
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activeStrategy, setActiveStrategy] = useState('Default');
   const [filters, setFilters] = useState({
     peRatio: [0, 100] as [number, number],
     pbRatio: [0, 20] as [number, number],
@@ -68,6 +70,52 @@ export default function Home() {
     });
   }, [stocks, filters]);
 
+  // Sort stocks based on active strategy
+  const sortedStocks = useMemo(() => {
+    const stocksToSort = [...filteredStocks]; // Create a mutable copy
+    
+    switch (activeStrategy) {
+      case 'Value':
+        return stocksToSort.sort((a, b) => {
+          // Handle null values by placing them at the end
+          if (a.peRatio === null && b.peRatio === null) return 0;
+          if (a.peRatio === null) return 1;
+          if (b.peRatio === null) return -1;
+          return a.peRatio - b.peRatio; // Ascending order (lowest P/E first)
+        });
+      
+      case 'High Dividend':
+        return stocksToSort.sort((a, b) => {
+          // Handle null values by placing them at the end
+          if (a.dividendYield === null && b.dividendYield === null) return 0;
+          if (a.dividendYield === null) return 1;
+          if (b.dividendYield === null) return -1;
+          return b.dividendYield - a.dividendYield; // Descending order (highest dividend first)
+        });
+      
+      case 'Growth':
+        return stocksToSort.sort((a, b) => {
+          // Handle null values by placing them at the end
+          if (a.peRatio === null && b.peRatio === null) return 0;
+          if (a.peRatio === null) return 1;
+          if (b.peRatio === null) return -1;
+          return b.peRatio - a.peRatio; // Descending order (highest P/E first)
+        });
+      
+      case 'Quality':
+        return stocksToSort.sort((a, b) => {
+          // Handle null values by placing them at the end
+          if (a.pbRatio === null && b.pbRatio === null) return 0;
+          if (a.pbRatio === null) return 1;
+          if (b.pbRatio === null) return -1;
+          return a.pbRatio - b.pbRatio; // Ascending order (lowest P/B first)
+        });
+      
+      default:
+        return stocksToSort; // Return in original order
+    }
+  }, [filteredStocks, activeStrategy]);
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
@@ -88,6 +136,11 @@ export default function Home() {
 
       <FilterBar onFilterChange={setFilters} />
 
+      <StrategyButtons 
+        activeStrategy={activeStrategy}
+        onStrategyChange={setActiveStrategy}
+      />
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <div className="text-center">
@@ -101,18 +154,23 @@ export default function Home() {
           {stocks.length > 0 ? (
             <div>
               <div className="mb-4">
-                <p className="text-gray-400">
-                  Showing {filteredStocks.length} of {stocks.length} stocks in {selectedExchange === 'US' ? 'USA' : 'Cyprus'}
-                  {filteredStocks.length !== stocks.length && (
-                    <span className="ml-2 text-blue-400">
-                      ({stocks.length - filteredStocks.length} filtered out)
-                    </span>
-                  )}
-                </p>
+                                 <p className="text-gray-400">
+                   Showing {sortedStocks.length} of {stocks.length} stocks in {selectedExchange === 'US' ? 'USA' : 'Cyprus'}
+                   {sortedStocks.length !== stocks.length && (
+                     <span className="ml-2 text-blue-400">
+                       ({stocks.length - sortedStocks.length} filtered out)
+                     </span>
+                   )}
+                   {activeStrategy !== 'Default' && (
+                     <span className="ml-2 text-green-400">
+                       • Sorted by {activeStrategy} strategy
+                     </span>
+                   )}
+                 </p>
               </div>
-              {filteredStocks.length > 0 ? (
-                <StockTable stocks={filteredStocks} />
-              ) : (
+                             {sortedStocks.length > 0 ? (
+                 <StockTable stocks={sortedStocks} />
+               ) : (
                 <div className="text-center py-12 bg-gray-800 border border-gray-700 rounded-lg">
                   <p className="text-gray-400 mb-2">No stocks match your current filter criteria.</p>
                   <p className="text-gray-500 text-sm">Try adjusting the filter ranges to see more results.</p>

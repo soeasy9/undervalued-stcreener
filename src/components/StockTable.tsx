@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Stock } from '@/services/fetchStockData';
 
@@ -17,6 +17,11 @@ export default function StockTable({ stocks }: StockTableProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const stocksPerPage = 50;
+
+  // Reset to first page when stocks change (e.g., when strategy changes)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [stocks]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
